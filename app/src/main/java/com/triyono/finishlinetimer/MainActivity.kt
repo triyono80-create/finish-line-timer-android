@@ -5,6 +5,10 @@ import android.content.ContentValues
 import android.content.pm.PackageManager
 import androidx.appcompat.app.AlertDialog
 import android.os.Bundle
+import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.pdf.PdfDocument
+import android.net.Uri
 import android.provider.MediaStore
 import android.speech.tts.TextToSpeech
 import android.view.Gravity
@@ -34,6 +38,7 @@ import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -49,6 +54,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private lateinit var recordButton: Button
     private lateinit var scanButton: Button
     private lateinit var resetButton: Button
+    private lateinit var listButton: Button
+    private lateinit var exportButton: Button
     private lateinit var cameraExecutor: ExecutorService
     private lateinit var tts: TextToSpeech
     private val recognizer by lazy { TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS) }
@@ -62,6 +69,12 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private val processing = AtomicBoolean(false)
     private val seen = linkedSetOf<String>()
     private val rows = mutableListOf<JSONObject>()
+
+    private val createPdfLauncher = registerForActivityResult(
+        ActivityResultContracts.CreateDocument("application/pdf")
+    ) { uri ->
+        if (uri != null) writeFinisherPdf(uri)
+    }
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -133,6 +146,14 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             text = "MULAI REKAM VIDEO"
             setOnClickListener { toggleRecording() }
         }
+        listButton = Button(this).apply {
+            text = "LIHAT DATA FINISHER"
+            setOnClickListener { showFinisherList() }
+        }
+        exportButton = Button(this).apply {
+            text = "EKSPOR HASIL KE PDF"
+            setOnClickListener { startPdfExport() }
+        }
         resetButton = Button(this).apply {
             text = "RESET DATA LOMBA"
             textSize = 16f
@@ -154,6 +175,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         page.addView(countText)
         page.addView(scanButton)
         page.addView(recordButton)
+        page.addView(listButton)
+        page.addView(exportButton)
         page.addView(resetButton)
         page.addView(hint)
         setContentView(scroll)
@@ -240,6 +263,131 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             if (::tts.isInitialized) tts.speak("Nomor $value tercatat", TextToSpeech.QUEUE_ADD, null, value + now)
         }
     }
+
+
+    private fun showFinisherList() {
+        if (rows.isEmpty()) {
+            AlertDialog.Builder(this)
+                .setTitle("DATA FINISHER")
+                .setMessage("Belum ada pelari yang tercatat.")
+                .setPositiveButton("TUTUP", null)
+                .show()
+            return
+        }
+
+        val sortedRows = rows.sortedBy { it.optLong("epoch") }
+        val lines = sortedRows.mapIndexed { index, row ->
+            val bib = row.optString("bib", "-")
+            val time = row.optString("time", "-")
+            "${index + 1}.  $bib\n    $time"
+        }.joinToString("\n\n")
+
+        val content = TextView(this).apply {
+            text = lines
+            textSize = 15f
+            setTextColor(0xFF10283F.toInt())
+            setPadding(dp(18), dp(12), dp(18), dp(12))
+        }
+        val scroll = ScrollView(this).apply {
+            addView(content)
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("DATA FINISHER (${sortedRows.size} PELARI)")
+            .setView(scroll)
+            .setPositiveButton("TUTUP", null)
+            .setNeutralButton("EKSPOR PDF") { _, _ -> startPdfExport() }
+            .show()
+    }
+
+    private fun startPdfExport() {
+        if (rows.isEmpty()) {
+            Toast.makeText(this, "Belum ada data finisher untuk diekspor.", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val fileName = "Hasil_Finisher_" +
+            SimpleDateFormat("yyyyMMdd_HHmm", Locale.US).format(Date()) + ".pdf"
+        createPdfLauncher.launch(fileName)
+    }
+
+    private fun writeFinisherPdf(uri: Uri) {
+        val document = PdfDocument()
+        val titlePaint = Paint().apply {
+            color = Color.rgb(16, 40, 63)
+            textSize = 20f
+            isFakeBoldText = true
+        }
+        val headerPaint = Paint().apply {
+            color = Color.DKGRAY
+            textSize = 12f
+            isFakeBoldText = true
+        }
+        val bodyPaint = Paint().apply {
+            color = Color.BLACK
+            textSize = 11f
+        }
+        val linePaint = Paint().apply {
+            color = Color.LTGRAY
+            strokeWidth = 1f
+        }
+
+        try {
+            val sortedRows = rows.sortedBy { it.optLong("epoch") }
+            val rowsPerPage =  thirtyFiveRowsPerPage()
+            val pageCount = ((sortedRows.size + rowsPerPage - 1) / rowsPerPage).coerceAtLeast(1)
+
+            for (pageNumber in 0 until pageCount) {
+                val pageInfo = PdfDocument.PageInfo.Builder(595, 842, pageNumber + 1).create()
+                val page = document.startPage(pageInfo)
+                val canvas = page.canvas
+                var y = 52f
+
+                canvas.drawText("HASIL FINISHER LOMBA", 40f, y, titlePaint)
+                y += 24f
+                canvas.drawText(
+                    "Diekspor: " + SimpleDateFormat("dd-MM-yyyy HH:mm", Locale.getDefault()).format(Date()),
+                    40f, y, bodyPaint
+                )
+                y += 28f
+
+                canvas.drawText("NO.", 40f, y, headerPaint)
+                canvas.drawText("NOMOR DADA", 85f, y, headerPaint)
+                canvas.drawText("WAKTU TERCATAT", 220f, y, headerPaint)
+                y += 10f
+                canvas.drawLine(40f, y, 555f, y, linePaint)
+                y += 20f
+
+                val start = pageNumber * rowsPerPage
+                val end = minOf(start + rowsPerPage, sortedRows.size)
+                for (index in start until end) {
+                    val row = sortedRows[index]
+                    canvas.drawText((index + 1).toString(), 40f, y, bodyPaint)
+                    canvas.drawText(row.optString("bib", "-"), 85f, y, bodyPaint)
+                    canvas.drawText(row.optString("time", "-"), 220f, y, bodyPaint)
+                    y += 19f
+                    canvas.drawLine(40f, y - 5f, 555f, y - 5f, linePaint)
+                }
+
+                canvas.drawText(
+                    "Total finisher: ${sortedRows.size}    Halaman ${pageNumber + 1}/$pageCount",
+                    40f, 810f, bodyPaint
+                )
+                document.finishPage(page)
+            }
+
+            contentResolver.openOutputStream(uri)?.use { output ->
+                document.writeTo(output)
+            } ?: throw IOException("Tidak dapat membuka lokasi penyimpanan PDF.")
+
+            Toast.makeText(this, "PDF hasil finisher berhasil disimpan.", Toast.LENGTH_LONG).show()
+        } catch (e: Exception) {
+            Toast.makeText(this, "Gagal membuat PDF: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
+        } finally {
+            document.close()
+        }
+    }
+
+    private fun thirtyFiveRowsPerPage(): Int = 35
 
     private fun confirmResetRaceData() {
         AlertDialog.Builder(this)
