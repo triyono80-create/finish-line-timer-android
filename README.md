@@ -10,6 +10,7 @@ Project Android native awal untuk OPPO A77s.
 - Membutuhkan dua pembacaan konsisten sebelum menyimpan nomor.
 - Mencegah nomor yang sama tercatat dua kali dalam satu instalasi.
 - Menyimpan catatan lokal dan mengucapkan nomor melalui Text-to-Speech.
+- Tombol RESET DATA LOMBA dengan dialog konfirmasi; menghapus catatan finisher dan nomor terakhir tanpa menghapus video yang sudah direkam.
 
 ## Build APK melalui GitHub Actions
 1. Unggah seluruh isi folder proyek ini ke root repository GitHub.

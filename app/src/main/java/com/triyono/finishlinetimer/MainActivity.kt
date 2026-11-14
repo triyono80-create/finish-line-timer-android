@@ -3,6 +3,7 @@ package com.triyono.finishlinetimer
 import android.Manifest
 import android.content.ContentValues
 import android.content.pm.PackageManager
+import androidx.appcompat.app.AlertDialog
 import android.os.Bundle
 import android.provider.MediaStore
 import android.speech.tts.TextToSpeech
@@ -46,6 +47,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private lateinit var countText: TextView
     private lateinit var recordButton: Button
     private lateinit var scanButton: Button
+    private lateinit var resetButton: Button
     private lateinit var cameraExecutor: ExecutorService
     private lateinit var tts: TextToSpeech
     private val recognizer by lazy { TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS) }
@@ -125,6 +127,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             text = "MULAI REKAM VIDEO"
             setOnClickListener { toggleRecording() }
         }
+        resetButton = Button(this).apply {
+            text = "RESET DATA LOMBA"
+            setOnClickListener { confirmResetRaceData() }
+        }
         val hint = TextView(this).apply {
             text = "Pastikan nomor dada terlihat jelas. Pembacaan otomatis memerlukan dua hasil yang konsisten. Periksa hasil sebelum dipakai sebagai hasil resmi."
             textSize = 12f
@@ -138,6 +144,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         page.addView(countText)
         page.addView(scanButton)
         page.addView(recordButton)
+        page.addView(resetButton)
         page.addView(hint)
         setContentView(page)
     }
@@ -220,6 +227,28 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             statusText.text = "✓ $value tercatat pada $stamp"
             if (::tts.isInitialized) tts.speak("Nomor $value tercatat", TextToSpeech.QUEUE_ADD, null, value + now)
         }
+    }
+
+    private fun confirmResetRaceData() {
+        AlertDialog.Builder(this)
+            .setTitle("Reset data lomba?")
+            .setMessage("Semua catatan finisher dan nomor terakhir akan dihapus dari aplikasi. Video yang sudah direkam tidak akan dihapus. Tindakan ini tidak dapat dibatalkan.")
+            .setNegativeButton("BATAL", null)
+            .setPositiveButton("RESET DATA") { _, _ ->
+                rows.clear()
+                seen.clear()
+                candidate = ""
+                candidateHits = 0
+                lastAcceptedAt = 0L
+                scanning = false
+                scanButton.text = "MULAI PEMBACAAN NOMOR"
+                saveRows()
+                latestText.text = "Nomor terakhir: —"
+                countText.text = "Total finisher: 0"
+                statusText.text = "Data lomba direset. Siap memulai lomba baru."
+                Toast.makeText(this, "Data finisher berhasil direset.", Toast.LENGTH_SHORT).show()
+            }
+            .show()
     }
 
     private fun toggleRecording() {
