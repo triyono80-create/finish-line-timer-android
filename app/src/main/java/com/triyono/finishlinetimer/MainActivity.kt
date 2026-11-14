@@ -11,6 +11,7 @@ import android.view.Gravity
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -84,6 +85,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             setPadding(18, 20, 18, 16)
             setBackgroundColor(0xFFEEF3F7.toInt())
         }
+        val scroll = ScrollView(this).apply {
+            isFillViewport = true
+            addView(page)
+        }
         val title = TextView(this).apply {
             text = "FINISH LINE TIMER\nRACE TIMING • OFFLINE"
             textSize = 22f
@@ -92,8 +97,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             setTypeface(null, android.graphics.Typeface.BOLD)
         }
         previewView = PreviewView(this).apply {
+            // Fixed preview height leaves room for every control on smaller phones.
             layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(260)
             )
             scaleType = PreviewView.ScaleType.FILL_CENTER
         }
@@ -129,6 +135,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
         resetButton = Button(this).apply {
             text = "RESET DATA LOMBA"
+            textSize = 16f
+            setTextColor(android.graphics.Color.WHITE)
+            backgroundTintList = android.content.res.ColorStateList.valueOf(0xFFC62828.toInt())
+            minHeight = dp(52)
             setOnClickListener { confirmResetRaceData() }
         }
         val hint = TextView(this).apply {
@@ -146,8 +156,10 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         page.addView(recordButton)
         page.addView(resetButton)
         page.addView(hint)
-        setContentView(page)
+        setContentView(scroll)
     }
+
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
     private fun requestPermissionsIfNeeded() {
         val needed = mutableListOf(Manifest.permission.CAMERA)

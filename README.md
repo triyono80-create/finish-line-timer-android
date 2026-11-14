@@ -27,3 +27,9 @@ Project Android native awal untuk OPPO A77s.
 - Data peserta dan hasil saat ini disimpan lokal di SharedPreferences; ekspor CSV, pengelolaan lomba, dan pencadangan belum dibuat.
 - ML Kit bundled model dimasukkan ke APK agar pengenalan teks dapat berjalan offline setelah APK terpasang. Build awal tetap memerlukan internet untuk mengambil dependensi.
 - Uji kamera, konsumsi baterai, suhu, kapasitas video, dan akurasi OCR pada perangkat sasaran sebelum perlombaan.
+
+
+## Update 1.2.0
+- Added a scrollable screen and fixed-height camera preview so controls remain reachable on smaller phones.
+- Highlighted the RESET DATA LOMBA button in red.
+- Increased Android versionCode to 3 so this build installs as a newer update.
